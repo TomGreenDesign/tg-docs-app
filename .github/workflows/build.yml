@@ -14,12 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
-            target: linux
+          # - platform: ubuntu-22.04
+          #   target: linux
           - platform: macos-latest
             target: macos
-          - platform: windows-latest
-            target: windows
+          # - platform: windows-latest
+          #   target: windows
 
     runs-on: ${{ matrix.platform }}
 

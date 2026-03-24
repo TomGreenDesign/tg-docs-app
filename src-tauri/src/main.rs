@@ -1,13 +1,18 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Mutex;
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    menu::{MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder},
     webview::{PageLoadEvent, PageLoadPayload},
-    Manager, Webview,
+    Manager, Webview, Wry,
 };
+use tauri_plugin_deep_link::DeepLinkExt;
 
 const APP_URL: &str = "https://docs.tomgreen.uk";
+
+/// Wraps the "Return to Docs" menu item so on_page_load can toggle it.
+struct ReturnHomeItem(Mutex<MenuItem<Wry>>);
 
 fn main() {
     tauri::Builder::default()
@@ -47,13 +52,21 @@ fn main() {
                 .close_window()
                 .build()?;
 
+            let return_home = MenuItemBuilder::with_id("return_home", "Return to Docs")
+                .enabled(false)
+                .build(app)?;
+
             let menu = MenuBuilder::new(app)
                 .item(&app_submenu)
                 .item(&edit_submenu)
                 .item(&window_submenu)
+                .item(&return_home)
                 .build()?;
 
             app.set_menu(menu)?;
+
+            // Store return_home in managed state for on_page_load access
+            app.manage(ReturnHomeItem(Mutex::new(return_home)));
 
             // --- Handle menu events ---
             let window = app.get_webview_window("main").unwrap();
@@ -71,7 +84,27 @@ fn main() {
                     "hard_refresh" => {
                         let _ = menu_window.eval("window.location.reload()");
                     }
+                    "return_home" => {
+                        let _ = menu_window.eval(&format!(
+                            "window.location.replace('{}')",
+                            APP_URL
+                        ));
+                    }
                     _ => {}
+                }
+            });
+
+            // --- Handle incoming deep links ---
+            let dl_window = window.clone();
+            app.deep_link().on_open_url(move |event| {
+                if let Some(url) = event.urls().first() {
+                    let path = url.path();
+                    let query = url.query().map(|q| format!("?{}", q)).unwrap_or_default();
+                    let target = format!("{}{}{}", APP_URL, path, query);
+                    let _ = dl_window.eval(&format!(
+                        "window.location.replace('{}')",
+                        target
+                    ));
                 }
             });
 
@@ -79,6 +112,18 @@ fn main() {
         })
         .on_page_load(|webview: &Webview, payload: &PageLoadPayload<'_>| {
             if payload.event() == PageLoadEvent::Finished {
+                // Toggle "Return to Docs" visibility based on current URL
+                let url = payload.url().to_string();
+                let is_away = !url.starts_with(APP_URL)
+                    || url.contains("/app")
+                    || url.contains("/login");
+                if let Some(state) = webview.app_handle().try_state::<ReturnHomeItem>() {
+                    if let Ok(item) = state.0.lock() {
+                        let _ = item.set_enabled(is_away);
+                    }
+                }
+
+                // Inject link rewriting JS
                 let _ = webview.eval(
                     r#"
                     (function() {
@@ -91,6 +136,24 @@ fn main() {
                         };
                         const currentHost = window.location.hostname;
 
+                        // Override window.open — WKWebView swallows these silently
+                        window.open = function(url, target, features) {
+                            if (!url) return null;
+                            try {
+                                const parsed = new URL(url, window.location.origin);
+                                const scheme = SCHEME_MAP[parsed.hostname];
+                                if (scheme && parsed.hostname !== currentHost) {
+                                    window.__TAURI__.shell.open(
+                                        scheme + '://' + parsed.pathname + parsed.search + parsed.hash
+                                    );
+                                } else {
+                                    window.__TAURI__.shell.open(parsed.href);
+                                }
+                            } catch(_) {}
+                            return null;
+                        };
+
+                        // Intercept <a> clicks
                         document.addEventListener('click', function(e) {
                             const link = e.target.closest('a');
                             if (!link) return;
@@ -98,11 +161,15 @@ fn main() {
                                 const url = new URL(link.href);
                                 const scheme = SCHEME_MAP[url.hostname];
                                 if (scheme && url.hostname !== currentHost) {
+                                    // Cross-app link → deep link to other Tauri app
                                     e.preventDefault();
-                                    const deepLink = scheme + '://' + url.pathname + url.search + url.hash;
-                                    if (window.__TAURI__ && window.__TAURI__.shell) {
-                                        window.__TAURI__.shell.open(deepLink);
-                                    }
+                                    window.__TAURI__.shell.open(
+                                        scheme + '://' + url.pathname + url.search + url.hash
+                                    );
+                                } else if (link.target === '_blank') {
+                                    // target="_blank" → open in system browser
+                                    e.preventDefault();
+                                    window.__TAURI__.shell.open(link.href);
                                 }
                             } catch(_) {}
                         }, true);
