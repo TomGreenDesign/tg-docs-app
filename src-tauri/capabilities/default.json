@@ -8,5 +8,8 @@
     "shell:allow-open",
     "deep-link:default",
     "updater:default"
-  ]
+  ],
+  "remote": {
+    "urls": ["https://dash.tomgreen.uk/*", "https://docs.tomgreen.uk/*"]
+  }
 }

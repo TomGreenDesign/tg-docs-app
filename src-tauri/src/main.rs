@@ -26,8 +26,12 @@ fn main() {
             let clear_data =
                 MenuItemBuilder::with_id("clear_data", "Clear Local Data").build(app)?;
 
+            let return_home = MenuItemBuilder::with_id("return_home", "Return to Docs")
+                .build(app)?;
+
             let app_submenu = SubmenuBuilder::new(app, "App")
                 .item(&hard_refresh)
+                .item(&return_home)
                 .separator()
                 .item(&sign_out)
                 .item(&clear_data)
@@ -50,14 +54,10 @@ fn main() {
                 .close_window()
                 .build()?;
 
-            let return_home = MenuItemBuilder::with_id("return_home", "Return to Docs")
-                .build(app)?;
-
             let menu = MenuBuilder::new(app)
                 .item(&app_submenu)
                 .item(&edit_submenu)
                 .item(&window_submenu)
-                .item(&return_home)
                 .build()?;
 
             app.set_menu(menu)?;
