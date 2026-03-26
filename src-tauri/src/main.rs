@@ -1,18 +1,14 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::Mutex;
 use tauri::{
-    menu::{MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder},
+    menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     webview::{PageLoadEvent, PageLoadPayload},
-    Manager, Webview, Wry,
+    Manager, Webview,
 };
 use tauri_plugin_deep_link::DeepLinkExt;
 
 const APP_URL: &str = "https://docs.tomgreen.uk";
-
-/// Wraps the "Return to Docs" menu item so on_page_load can toggle it.
-struct ReturnHomeItem(Mutex<MenuItem<Wry>>);
 
 fn main() {
     tauri::Builder::default()
@@ -53,7 +49,6 @@ fn main() {
                 .build()?;
 
             let return_home = MenuItemBuilder::with_id("return_home", "Return to Docs")
-                .enabled(false)
                 .build(app)?;
 
             let menu = MenuBuilder::new(app)
@@ -64,9 +59,6 @@ fn main() {
                 .build()?;
 
             app.set_menu(menu)?;
-
-            // Store return_home in managed state for on_page_load access
-            app.manage(ReturnHomeItem(Mutex::new(return_home)));
 
             // --- Handle menu events ---
             let window = app.get_webview_window("main").unwrap();
@@ -112,18 +104,9 @@ fn main() {
         })
         .on_page_load(|webview: &Webview, payload: &PageLoadPayload<'_>| {
             if payload.event() == PageLoadEvent::Finished {
-                // Toggle "Return to Docs" visibility based on current URL
-                let url = payload.url().to_string();
-                let is_away = !url.starts_with(APP_URL)
-                    || url.contains("/app")
-                    || url.contains("/login");
-                if let Some(state) = webview.app_handle().try_state::<ReturnHomeItem>() {
-                    if let Ok(item) = state.0.lock() {
-                        let _ = item.set_enabled(is_away);
-                    }
-                }
-
                 // Inject link rewriting JS
+                // Note: window.__TAURI__.shell.open() is NOT available on remote pages
+                // because the npm plugin JS isn't loaded. Use the raw IPC invoke instead.
                 let _ = webview.eval(
                     r#"
                     (function() {
@@ -136,6 +119,13 @@ fn main() {
                         };
                         const currentHost = window.location.hostname;
 
+                        function shellOpen(url) {
+                            return window.__TAURI__.core.invoke('plugin:shell|open', {
+                                path: url,
+                                with: ''
+                            });
+                        }
+
                         // Override window.open — WKWebView swallows these silently
                         window.open = function(url, target, features) {
                             if (!url) return null;
@@ -143,11 +133,11 @@ fn main() {
                                 const parsed = new URL(url, window.location.origin);
                                 const scheme = SCHEME_MAP[parsed.hostname];
                                 if (scheme && parsed.hostname !== currentHost) {
-                                    window.__TAURI__.shell.open(
+                                    shellOpen(
                                         scheme + '://' + parsed.pathname + parsed.search + parsed.hash
                                     );
                                 } else {
-                                    window.__TAURI__.shell.open(parsed.href);
+                                    shellOpen(parsed.href);
                                 }
                             } catch(_) {}
                             return null;
@@ -161,15 +151,13 @@ fn main() {
                                 const url = new URL(link.href);
                                 const scheme = SCHEME_MAP[url.hostname];
                                 if (scheme && url.hostname !== currentHost) {
-                                    // Cross-app link → deep link to other Tauri app
                                     e.preventDefault();
-                                    window.__TAURI__.shell.open(
+                                    shellOpen(
                                         scheme + '://' + url.pathname + url.search + url.hash
                                     );
                                 } else if (link.target === '_blank') {
-                                    // target="_blank" → open in system browser
                                     e.preventDefault();
-                                    window.__TAURI__.shell.open(link.href);
+                                    shellOpen(link.href);
                                 }
                             } catch(_) {}
                         }, true);
