@@ -7,6 +7,7 @@ use tauri::{
     Manager, Webview,
 };
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_updater::UpdaterExt;
 
 const APP_URL: &str = "https://docs.tomgreen.uk";
 
@@ -14,6 +15,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // --- Build menu ---
             let hard_refresh = MenuItemBuilder::with_id("hard_refresh", "Hard Refresh")
@@ -97,6 +99,21 @@ fn main() {
                         "window.location.replace('{}')",
                         target
                     ));
+                }
+            });
+
+            // --- Check for updates in the background ---
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let updater = match app_handle.updater() {
+                    Ok(u) => u,
+                    Err(_) => return,
+                };
+                if let Ok(Some(update)) = updater.check().await {
+                    let _ = update
+                        .download_and_install(|_chunk, _total| {}, || {})
+                        .await;
+                    app_handle.restart();
                 }
             });
 
