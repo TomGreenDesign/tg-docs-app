@@ -178,6 +178,18 @@ fn main() {
                                 }
                             } catch(_) {}
                         }, true);
+
+                        // Fix drag-to-reorder showing copy/insert instead of move in WKWebView
+                        document.addEventListener('dragstart', function(e) {
+                            if (e.target.closest('.tiptap') || e.target.closest('.drag-handle-icon')) {
+                                e.dataTransfer.effectAllowed = 'move';
+                            }
+                        }, true);
+                        document.addEventListener('dragover', function(e) {
+                            if (e.target.closest('.tiptap')) {
+                                e.dataTransfer.dropEffect = 'move';
+                            }
+                        }, true);
                     })();
                     "#,
                 );
