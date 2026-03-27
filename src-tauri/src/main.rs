@@ -106,7 +106,11 @@ fn main() {
                     let url_str = url.as_str();
                     eprintln!("[tg-docs] on_new_window: {}", url_str);
 
-                    if url.host_str() == Some(OTHER_HOST) {
+                    // Cross-app: other domain OR /tg-dash path on same domain
+                    let is_other_app = url.host_str() == Some(OTHER_HOST)
+                        || (url.host_str() == Some(APP_HOST) && url.path().starts_with("/tg-dash"));
+
+                    if is_other_app {
                         let query = url.query().map(|q| format!("?{}", q)).unwrap_or_default();
                         let deep = format!("{}://{}{}", OTHER_SCHEME, url.path(), query);
                         open_url(&deep);
@@ -121,8 +125,11 @@ fn main() {
                     let url_str = url.as_str();
                     eprintln!("[tg-docs] on_navigation: {}", url_str);
 
-                    // Cross-app links → deep link scheme
-                    if url.host_str() == Some(OTHER_HOST) {
+                    // Cross-app: other domain OR /tg-dash path on same domain
+                    let is_other_app = url.host_str() == Some(OTHER_HOST)
+                        || (url.host_str() == Some(APP_HOST) && url.path().starts_with("/tg-dash"));
+
+                    if is_other_app {
                         let query = url.query().map(|q| format!("?{}", q)).unwrap_or_default();
                         let deep = format!("{}://{}{}", OTHER_SCHEME, url.path(), query);
                         open_url(&deep);
