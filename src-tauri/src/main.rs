@@ -196,13 +196,24 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 let updater = match app_handle.updater() {
                     Ok(u) => u,
-                    Err(_) => return,
+                    Err(e) => {
+                        eprintln!("[tg-docs] updater init failed: {}", e);
+                        return;
+                    }
                 };
-                if let Ok(Some(update)) = updater.check().await {
-                    let _ = update
-                        .download_and_install(|_chunk, _total| {}, || {})
-                        .await;
-                    app_handle.restart();
+                match updater.check().await {
+                    Ok(Some(update)) => {
+                        eprintln!("[tg-docs] update available: {}", update.version);
+                        match update.download_and_install(|_, _| {}, || {}).await {
+                            Ok(_) => {
+                                eprintln!("[tg-docs] update installed, restarting");
+                                app_handle.restart();
+                            }
+                            Err(e) => eprintln!("[tg-docs] update install failed: {}", e),
+                        }
+                    }
+                    Ok(None) => eprintln!("[tg-docs] no update available"),
+                    Err(e) => eprintln!("[tg-docs] update check failed: {}", e),
                 }
             });
 
