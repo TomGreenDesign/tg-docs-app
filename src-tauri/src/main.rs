@@ -82,6 +82,7 @@ fn main() {
                 .title("TG Docs")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(800.0, 600.0)
+                .disable_drag_drop_handler()
                 // JS that runs on every page load (including after redirects)
                 .initialization_script(r#"
                     (function() {
