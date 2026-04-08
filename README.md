@@ -1,17 +1,17 @@
-# TG Docs
+# Mokimo Docs
 
-Native desktop app for [docs.tomgreen.uk](https://docs.tomgreen.uk) built with [Tauri v2](https://v2.tauri.app).
+Native desktop app for [docs.mokimo.co.uk](https://docs.mokimo.co.uk) built with [Tauri v2](https://v2.tauri.app).
 
-Wraps the TG Docs site in a lightweight native window — no Electron, no bundled Chromium. Uses the OS webview (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux).
+Wraps the Mokimo Docs site in a lightweight native window — no Electron, no bundled Chromium. Uses the OS webview (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux).
 
 ## How it works
 
-The app loads a single `index.html` that redirects to `https://docs.tomgreen.uk`. All content is served from the site — this is a thin native shell.
+The app loads a single `index.html` that redirects to `https://docs.mokimo.co.uk`. All content is served from the site — this is a thin native shell.
 
 ## Project structure
 
 ```
-src/              HTML entrypoint (redirects to docs.tomgreen.uk)
+src/              HTML entrypoint (redirects to docs.mokimo.co.uk)
 src-tauri/
   tauri.conf.json Tauri config (window size, app ID, icons, bundling)
   icons/          App icons (all sizes + .icns/.ico)
@@ -47,7 +47,7 @@ Produces platform-native installers in `src-tauri/target/release/bundle/`:
 
 GitHub Actions builds for all three platforms on push to `main`. Download artifacts from the **Actions** tab.
 
-| Identifier | `uk.tomgreen.docs` |
+| Identifier | `uk.co.mokimo.docs` |
 |---|---|
 | **Version** | `0.1.0` |
 | **Window** | 1280x800 (min 800x600) |
