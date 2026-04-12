@@ -23,8 +23,8 @@ jobs:
           #   target: linux
           - platform: macos-latest
             target: macos
-          # - platform: windows-latest
-          #   target: windows
+          - platform: windows-latest
+            target: windows
 
     runs-on: ${{ matrix.platform }}
 
